@@ -7,46 +7,6 @@
     <script type="text/javascript" src="./js/glMatrix-0.9.5.min.js"></script>
     <script type="text/javascript" src="./js/webgl-utils.js"></script>
 
-    <!--
-    TODO HERE:
-    modify fragment shader or write another one
-    to implement flat, gouraud and phong shading
- -->
-    <script id="fragmentShader" type="fragment">
-    precision mediump float;
-
-    varying vec4 fragcolor;
-
-    void main(void) {
-        gl_FragColor = fragcolor;
-    }
-    </script>
-
-    <!--
-    TODO HERE:
-    modify vertex shader or write another one
-    to implement flat, gouraud and phong shading
-
-    NOTE:
-    if you want to write bonus part (texture mapping),
-    only Teapot.json has extra attribute "vertexTextureCoords"
-    which is used for texture mappping.
- -->
-    <script id="vertexShader" type="vertex">
-    attribute vec3 aVertexPosition;
-    attribute vec3 aFrontColor;
-
-    uniform mat4 uMVMatrix;
-    uniform mat4 uPMatrix;
-
-	varying vec4 fragcolor;
-
-    void main(void) {
-        fragcolor = vec4(aFrontColor.rgb, 1.0);
-        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
-    }
-    </script>
-
     <script type="text/javascript" src="./src/shader.js"></script>
 
     <script type="text/javascript">
@@ -57,12 +17,13 @@
 
         var mvMatrix = mat4.create();
         var pMatrix = mat4.create();
+        var nMatrix = mat3.create();
 
-        var teapotVertexPositionBuffer;
-        var teapotVertexNormalBuffer;
-        var teapotVertexFrontColorBuffer;
+        var modelVertexPositionBuffer;
+        var modelVertexNormalBuffer;
+        var modelVertexFrontColorBuffer;
 
-        var teapotAngle = 180;
+        var modelAngle = 180;
         var lastTime = 0;
 
         function initGL(canvas) {
@@ -70,6 +31,9 @@
                 gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
                 gl.viewportWidth = canvas.width;
                 gl.viewportHeight = canvas.height;
+                if (!gl.getExtension('OES_standard_derivatives')) {
+                    throw 'extension not support';
+                }
             }
             catch (e) {
             }
@@ -77,6 +41,37 @@
             if (!gl) {
                 alert("Could not initialize WebGL, sorry :-(");
             }
+        }
+
+        function handleLoadedModel(modelData) {
+            modelVertexPositionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexPositions), gl.STATIC_DRAW);
+            modelVertexPositionBuffer.itemSize = 3;
+            modelVertexPositionBuffer.numItems = modelData.vertexPositions.length / 3;
+
+            modelVertexNormalBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexNormalBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexNormals), gl.STATIC_DRAW);
+            modelVertexNormalBuffer.itemSize = 3;
+            modelVertexNormalBuffer.numItems = modelData.vertexNormals.length / 3;
+
+            modelVertexFrontColorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexFrontColorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexFrontcolors), gl.STATIC_DRAW);
+            modelVertexFrontColorBuffer.itemSize = 3;
+            modelVertexFrontColorBuffer.numItems = modelData.vertexFrontcolors.length / 3;
+        }
+
+        function loadModel(modelName) {
+            var request = new XMLHttpRequest();
+            request.open("GET", `./model/${modelName}.json`);
+            request.onreadystatechange = function () {
+                if (request.readyState == 4) {
+                    handleLoadedModel(JSON.parse(request.responseText));
+                }
+            }
+            request.send();
         }
 
         function getShader(gl, shaderScript, shader) {
@@ -99,8 +94,8 @@
 
         function initShaders(shaderScripts) {
 
-            var fragmentShader = getShader(gl, shaderScripts.fragmentShader, gl.createShader(gl.FRAGMENT_SHADER));
             var vertexShader = getShader(gl, shaderScripts.vertexShader, gl.createShader(gl.VERTEX_SHADER));
+            var fragmentShader = getShader(gl, shaderScripts.fragmentShader, gl.createShader(gl.FRAGMENT_SHADER));
 
             shaderProgram = gl.createProgram();
             gl.attachShader(shaderProgram, vertexShader);
@@ -115,51 +110,123 @@
 
             shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
             gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
             shaderProgram.vertexFrontColorAttribute = gl.getAttribLocation(shaderProgram, "aFrontColor");
             gl.enableVertexAttribArray(shaderProgram.vertexFrontColorAttribute);
 
+            shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+            gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
             shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
             shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+
+            shaderProgram.materialShininessUniform = gl.getUniformLocation(shaderProgram, "uMaterialShininess");
+
+            shaderProgram.pointLightingLocationUniform = gl.getUniformLocation(shaderProgram, "uPointLightingLocation");
+
+            shaderProgram.pointLightingSpecularColorUniform = gl.getUniformLocation(shaderProgram, "uPointLightingSpecularColor");
+            shaderProgram.pointLightingDiffuseColorUniform = gl.getUniformLocation(shaderProgram, "uPointLightingDiffuseColor");
+            shaderProgram.ambientColorUniform = gl.getUniformLocation(shaderProgram, "uAmbientColor");
         }
 
         function setMatrixUniforms() {
             gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
             gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+
+            mat4.toInverseMat3(mvMatrix, nMatrix);
+            mat3.transpose(nMatrix);
+            gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, nMatrix);
+        }
+
+        function setShaderAttributes() {
+
+            gl.uniform3f(
+                shaderProgram.pointLightingLocationUniform,
+                parseFloat(document.getElementById("pointLightingLocationX").value),
+                parseFloat(document.getElementById("pointLightingLocationY").value),
+                parseFloat(document.getElementById("pointLightingLocationZ").value)
+            );
+
+            gl.uniform3f(
+                shaderProgram.ambientColorUniform,
+                parseFloat(document.getElementById("ambientR").value),
+                parseFloat(document.getElementById("ambientG").value),
+                parseFloat(document.getElementById("ambientB").value)
+            );
+
+            gl.uniform3f(
+                shaderProgram.pointLightingSpecularColorUniform,
+                parseFloat(document.getElementById("specularR").value),
+                parseFloat(document.getElementById("specularG").value),
+                parseFloat(document.getElementById("specularB").value)
+            );
+
+            gl.uniform3f(
+                shaderProgram.pointLightingDiffuseColorUniform,
+                parseFloat(document.getElementById("diffuseR").value),
+                parseFloat(document.getElementById("diffuseG").value),
+                parseFloat(document.getElementById("diffuseB").value)
+            );
+
+            gl.uniform1f(shaderProgram.materialShininessUniform, parseFloat(document.getElementById("shininess").value));
+
+            // Setup model position data
+            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexPositionBuffer);
+            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute,
+                modelVertexPositionBuffer.itemSize,
+                gl.FLOAT,
+                false,
+                0,
+                0);
+
+            // Setup model front color data
+            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexFrontColorBuffer);
+            gl.vertexAttribPointer(shaderProgram.vertexFrontColorAttribute,
+                modelVertexFrontColorBuffer.itemSize,
+                gl.FLOAT,
+                false,
+                0,
+                0);
+
+            // Setup model normal data
+            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexNormalBuffer);
+            gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute,
+                modelVertexNormalBuffer.itemSize,
+                gl.FLOAT,
+                false,
+                0,
+                0);
         }
 
         function degToRad(degrees) {
             return degrees * Math.PI / 180;
         }
 
-        function handleLoadedTeapot(teapotData) {
-            teapotVertexPositionBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
-            teapotVertexPositionBuffer.itemSize = 3;
-            teapotVertexPositionBuffer.numItems = teapotData.vertexPositions.length / 3;
+        function setScales() {
+            let scaleX = parseFloat(document.getElementById("scaleX").value)
+            let scaleY = parseFloat(document.getElementById("scaleY").value)
+            let scaleZ = parseFloat(document.getElementById("scaleZ").value)
 
-            teapotVertexNormalBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
-            teapotVertexNormalBuffer.itemSize = 3;
-            teapotVertexNormalBuffer.numItems = teapotData.vertexNormals.length / 3;
-
-            teapotVertexFrontColorBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexFrontcolors), gl.STATIC_DRAW);
-            teapotVertexFrontColorBuffer.itemSize = 3;
-            teapotVertexFrontColorBuffer.numItems = teapotData.vertexFrontcolors.length / 3;
+            mat4.scale(mvMatrix, [scaleX, scaleY, scaleZ]);
         }
 
-        function loadTeapot() {
-            var request = new XMLHttpRequest();
-            request.open("GET", "./model/Teapot.json");
-            request.onreadystatechange = function () {
-                if (request.readyState == 4) {
-                    handleLoadedTeapot(JSON.parse(request.responseText));
-                }
-            }
-            request.send();
+        function setTranslates() {
+            let translateX = parseFloat(document.getElementById("translateX").value)
+            let translateY = parseFloat(document.getElementById("translateY").value)
+            let translateZ = parseFloat(document.getElementById("translateZ").value)
+
+            mat4.translate(mvMatrix, [translateX, translateY, translateZ]);
+        }
+
+        function setRotations() {
+            let rotationX = parseFloat(document.getElementById("rotationX").value);
+            let rotationY = parseFloat(document.getElementById("rotationY").value);
+            let rotationZ = parseFloat(document.getElementById("rotationZ").value);
+
+            mat4.rotateX(mvMatrix, degToRad(rotationX));
+            mat4.rotateY(mvMatrix, degToRad(rotationY));
+            mat4.rotateZ(mvMatrix, degToRad(rotationZ));
+            mat4.rotate(mvMatrix, degToRad(modelAngle), [0, 1, 0]);
         }
 
         /*
@@ -171,49 +238,35 @@
             gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-            if (teapotVertexPositionBuffer == null ||
-                teapotVertexNormalBuffer == null ||
-                teapotVertexFrontColorBuffer == null) {
+            if (modelVertexPositionBuffer == null ||
+                modelVertexNormalBuffer == null ||
+                modelVertexFrontColorBuffer == null) {
 
                 return;
             }
+
+            setShaderAttributes();
 
             // Setup Projection Matrix
             mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 
             // Setup Model-View Matrix
             mat4.identity(mvMatrix);
-            mat4.translate(mvMatrix, [0, 0, -100]);
-            mat4.rotate(mvMatrix, degToRad(teapotAngle), [0, 1, 0]);
+
+            setScales();
+            setTranslates();
+            setRotations();
 
             setMatrixUniforms();
 
-            // Setup teapot position data
-            gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
-            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute,
-                teapotVertexPositionBuffer.itemSize,
-                gl.FLOAT,
-                false,
-                0,
-                0);
-
-            // Setup teapot front color data
-            gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexFrontColorBuffer);
-            gl.vertexAttribPointer(shaderProgram.vertexFrontColorAttribute,
-                teapotVertexFrontColorBuffer.itemSize,
-                gl.FLOAT,
-                false,
-                0,
-                0);
-
-            gl.drawArrays(gl.TRIANGLES, 0, teapotVertexPositionBuffer.numItems);
+            gl.drawArrays(gl.TRIANGLES, 0, modelVertexPositionBuffer.numItems);
         }
 
         function animate() {
             var timeNow = new Date().getTime();
             if (lastTime != 0) {
                 var elapsed = timeNow - lastTime;
-                teapotAngle += 0.03 * elapsed;
+                modelAngle += 0.03 * elapsed;
             }
 
             lastTime = timeNow;
@@ -229,7 +282,7 @@
             var canvas = document.getElementById("ICG-canvas");
             initGL(canvas);
             updateShaderType()
-            loadTeapot();
+            loadModel("Teapot");
 
             gl.clearColor(0.0, 0.2, 0.2, 1.0);
             gl.enable(gl.DEPTH_TEST);
@@ -237,15 +290,23 @@
             tick();
         }
 
-        function updateShaderType() {
-            var shaderOpt = document.getElementById("shaderSelect");
+        function updateShaderType(shaderOpt) {
+
             var shaderScripts;
-            if (shaderOpt.value == "other") {
+
+            if (shaderOpt == "other") {
                 shaderScripts = shaders.other;
+            } else if (shaderOpt == "flat") {
+                shaderScripts = shaders.flat;
             } else {
                 shaderScripts = shaders.other;
             }
+
             initShaders(shaderScripts)
+        }
+
+        function displayValue(val, elementId) {
+            document.getElementById(elementId).innerHTML = val;
         }
 
     </script>
@@ -254,12 +315,199 @@
 <body onload="webGLStart();">
     <canvas id="ICG-canvas" style="border: none;" width="1280" height="720"></canvas>
     <br />
-    <select id="shaderSelect" onchange="updateShaderType()">
+    <select id="shaderSelect" onchange="updateShaderType(this.value)">
         <option value="flat">flat</option>
         <option value="other" selected="selected">other</option>
         <option value="gouraud">gouraud</option>
         <option value="phong">phong</option>
     </select>
+
+    <select id="modelSelect" onchange="loadModel(this.value)">
+        <option value="Model" selected="selected">Model</option>
+        <option value="Plant">Plant</option>
+        <option value="Easter">Easter</option>
+        <option value="Longteap">Longteap</option>
+    </select>
+
+    <input type="range" id="shininess" value="32.0" min="0" max="100" step="0.5"
+        oninput="displayValue(this.value, 'shininess-val');">
+    <span id="shininess-val"></span>
+
+    <form class="pure-form pure-form-aligned">
+        <legend>Translate</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="translateX" class="pure-range"> X </label>
+                <input type="range" id="translateX" value="0" min="-500" max="500" step="0.01"
+                    oninput="displayValue(this.value, 'translateX-val');">
+                <span id="translateX-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="translateY" class="pure-range"> Y </label>
+                <input type="range" id="translateY" value="0" min="-500" max="500" step="0.01"
+                    oninput="displayValue(this.value, 'translateY-val');">
+                <span id="translateY-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="translateZ" class="pure-range"> Z </label>
+                <input type="range" id="translateZ" value="-100" min="-500" max="500" step="0.01"
+                    oninput="displayValue(this.value, 'translateZ-val');">
+                <span id="translateZ-val"></span>
+            </div>
+        </fieldset>
+    </form>
+
+    <form class="pure-form pure-form-aligned">
+        <legend>Point Lighting</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="lightPoint-0-enable" class="pure-checkbox">L1</label>
+                <input id="lightPoint-0-enable" type="checkbox"> Main Light
+            </div>
+            <div class="pure-control-group">
+                <label for="lightPoint-1-enable" class="pure-checkbox">L2</label>
+                <input id="lightPoint-1-enable" type="checkbox"> Key Light
+            </div>
+            <div class="pure-control-group">
+                <label for="lightPoint-2-enable" class="pure-checkbox">L3</label>
+                <input id="lightPoint-2-enable" type="checkbox"> Back Light
+            </div>
+        </fieldset>
+        <legend>Point Lighting Location</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="pointLightingLocationX" class="pure-range">X </label>
+                <input type="range" id="pointLightingLocationX" value="-10.0" min="-100" max="100"
+                    oninput="displayValue(this.value, 'pointLightingLocationX-val');">
+                <span id="pointLightingLocationX-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="pointLightingLocationY" class="pure-range">Y </label>
+                <input type="range" id="pointLightingLocationY" value="4.0" min="-100" max="100"
+                    oninput="displayValue(this.value, 'pointLightingLocationY-val');">
+                <span id="pointLightingLocationY-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="pointLightingLocationZ" class="pure-range">Z </label>
+                <input type="range" id="pointLightingLocationZ" value="-20.0" min="-100" max="100"
+                    oninput="displayValue(this.value, 'pointLightingLocationZ-val');">
+                <span id="pointLightingLocationZ-val"></span>
+            </div>
+        </fieldset>
+    </form>
+
+    <form class="pure-form pure-form-aligned">
+        <legend>Specular Color</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="specularR" class="pure-range"> R </label>
+                <input type="range" id="specularR" value="0.8" min="0" max="1" step="0.01"
+                    oninput="displayValue(this.value, 'specularR-val');">
+                <span id="specularR-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="specularG" class="pure-range"> G </label>
+                <input type="range" id="specularG" value="0.8" min="0" max="1" step="0.01"
+                    oninput="displayValue(this.value, 'specularG-val');">
+                <span id="specularG-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="specularB" class="pure-range"> B </label>
+                <input type="range" id="specularB" value="0.8" min="0" max="1" step="0.01"
+                    oninput="displayValue(this.value, 'specularB-val');">
+                <span id="specularB-val"></span>
+            </div>
+        </fieldset>
+    </form>
+    <form class="pure-form pure-form-aligned">
+        <legend>Diffuse Color</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="diffuseR" class="pure-range"> R </label>
+                <input type="range" id="diffuseR" value="0.8" min="0" max="1" step="0.01">
+                <span id="diffuseR-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="diffuseG" class="pure-range"> G </label>
+                <input type="range" id="diffuseG" value="0.8" min="0" max="1" step="0.01">
+                <span id="diffuseG-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="diffuseB" class="pure-range"> B </label>
+                <input type="range" id="diffuseB" value="0.8" min="0" max="1" step="0.01">
+                <span id="diffuseB-val"></span>
+            </div>
+        </fieldset>
+    </form>
+    <form class="pure-form pure-form-aligned">
+        <legend>Ambient Light Color</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="ambientR" class="pure-range"> R </label>
+                <input type="range" id="ambientR" value="0.2" min="0" max="1" step="0.01">
+                <span id="ambientR-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="ambientG" class="pure-range"> G </label>
+                <input type="range" id="ambientG" value="0.2" min="0" max="1" step="0.01">
+                <span id="ambientG-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="ambientB" class="pure-range"> B </label>
+                <input type="range" id="ambientB" value="0.2" min="0" max="1" step="0.01">
+                <span id="ambientB-val"></span>
+            </div>
+        </fieldset>
+    </form>
+
+    <form class="pure-form pure-form-aligned">
+        <legend>Scale</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="scaleX" class="pure-range"> X </label>
+                <input type="range" id="scaleX" value="1" min="0.1" max="5" step="0.01"
+                    oninput="displayValue(this.value, 'scaleX-val');">
+                <span id="scaleX-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="scaleY" class="pure-range"> Y </label>
+                <input type="range" id="scaleY" value="1" min="0.1" max="5" step="0.01"
+                    oninput="displayValue(this.value, 'scaleY-val');">
+                <span id="scaleY-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="scaleZ" class="pure-range"> Z </label>
+                <input type="range" id="scaleZ" value="1" min="0.1" max="5" step="0.01"
+                    oninput="displayValue(this.value, 'scaleZ-val');">
+                <span id="scaleZ-val"></span>
+            </div>
+        </fieldset>
+    </form>
+
+    <form class="pure-form pure-form-aligned">
+        <legend>Rotation</legend>
+        <fieldset>
+            <div class="pure-control-group">
+                <label for="rotationX" class="pure-range"> X </label>
+                <input type="range" id="rotationX" value="0" min="-180" max="180" step="1"
+                    oninput="displayValue(this.value, 'rotationX-val');">
+                <span id="rotationX-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="rotationY" class="pure-range"> Y </label>
+                <input type="range" id="rotationY" value="0" min="-180" max="180" step="1"
+                    oninput="displayValue(this.value, 'rotationY-val');">
+                <span id="rotationY-val"></span>
+            </div>
+            <div class="pure-control-group">
+                <label for="rotationZ" class="pure-range"> Z </label>
+                <input type="range" id="rotationZ" value="0" min="-180" max="180" step="1"
+                    oninput="displayValue(this.value, 'rotationZ-val');">
+                <span id="rotationZ-val"></span>
+            </div>
+        </fieldset>
+    </form>
+
 </body>
 
 </html>
