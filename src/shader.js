@@ -110,6 +110,63 @@ varying vec3 vLightDirection;
 
 uniform vec3 uPointLightingLocation;
 
+uniform float uMaterialShininess;
+
+uniform vec3 uAmbientColor;
+uniform vec3 uPointLightingSpecularColor;
+uniform vec3 uPointLightingDiffuseColor;
+
+void main(void) {
+
+    vNormalDirection = normalize(uNMatrix * aVertexNormal);
+
+    vVertexPosition = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
+
+    vLightDirection = normalize(uPointLightingLocation - vVertexPosition);
+
+    vec3 reflectionDirection = reflect(-vLightDirection, vNormalDirection);
+
+    float specularLightWeighting = pow(max(dot(reflectionDirection, normalize(-vVertexPosition.xyz)), 0.0), uMaterialShininess);
+
+    float diffuseLightWeighting = max(dot(vNormalDirection, vLightDirection), 0.0);
+
+    vec3 lightWeighting = uAmbientColor + uPointLightingSpecularColor * specularLightWeighting + uPointLightingDiffuseColor * diffuseLightWeighting;
+
+    vFragcolor = vec4(aFrontColor, 1.0);
+    vFragcolor = vec4(vFragcolor.rgb * lightWeighting, vFragcolor.a);
+
+    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+}
+`
+
+shaders.gouraud.fragmentShader = `
+precision mediump float;
+
+varying vec4 vFragcolor;
+
+void main(void) {
+	gl_FragColor = vFragcolor;
+}
+`
+
+shaders.phong.vertexShader = `
+precision mediump float;
+
+attribute vec3 aVertexPosition;
+attribute vec3 aVertexNormal;
+attribute vec3 aFrontColor;
+
+uniform mat4 uMVMatrix;
+uniform mat4 uPMatrix;
+uniform mat3 uNMatrix;
+
+varying vec4 vFragcolor;
+varying vec3 vNormalDirection;
+varying vec3 vVertexPosition;
+varying vec3 vLightDirection;
+
+uniform vec3 uPointLightingLocation;
+
 void main(void) {
 
     vNormalDirection = normalize(uNMatrix * aVertexNormal);
@@ -124,7 +181,7 @@ void main(void) {
 }
 `
 
-shaders.gouraud.fragmentShader = `
+shaders.phong.fragmentShader = `
 precision mediump float;
 
 varying vec4 vFragcolor;
