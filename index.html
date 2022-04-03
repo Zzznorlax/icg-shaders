@@ -1,6 +1,7 @@
 <html>
 
 <head>
+    <link href="styles/style.css" rel="stylesheet">
     <title>ICG WebGL &mdash; HW1</title>
     <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
 
@@ -9,22 +10,14 @@
 
     <script type="text/javascript" src="./src/shader.js"></script>
 
+    <script type="text/javascript" src="./src/model.js"></script>
+
     <script type="text/javascript">
 
         // common variables
         var gl;
-        var shaderProgram;
 
-        var mvMatrix = mat4.create();
-        var pMatrix = mat4.create();
-        var nMatrix = mat3.create();
-
-        var modelVertexPositionBuffer;
-        var modelVertexNormalBuffer;
-        var modelVertexFrontColorBuffer;
-
-        var modelAngle = 180;
-        var lastTime = 0;
+        var drawObject;
 
         function initGL(canvas) {
             try {
@@ -43,193 +36,6 @@
             }
         }
 
-        function handleLoadedModel(modelData) {
-            modelVertexPositionBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexPositionBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexPositions), gl.STATIC_DRAW);
-            modelVertexPositionBuffer.itemSize = 3;
-            modelVertexPositionBuffer.numItems = modelData.vertexPositions.length / 3;
-
-            modelVertexNormalBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexNormalBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexNormals), gl.STATIC_DRAW);
-            modelVertexNormalBuffer.itemSize = 3;
-            modelVertexNormalBuffer.numItems = modelData.vertexNormals.length / 3;
-
-            modelVertexFrontColorBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexFrontColorBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(modelData.vertexFrontcolors), gl.STATIC_DRAW);
-            modelVertexFrontColorBuffer.itemSize = 3;
-            modelVertexFrontColorBuffer.numItems = modelData.vertexFrontcolors.length / 3;
-        }
-
-        function loadModel(modelName) {
-            var request = new XMLHttpRequest();
-            request.open("GET", `./model/${modelName}.json`);
-            request.onreadystatechange = function () {
-                if (request.readyState == 4) {
-                    handleLoadedModel(JSON.parse(request.responseText));
-                }
-            }
-            request.send();
-        }
-
-        function getShader(gl, shaderScript, shader) {
-
-            if (!shaderScript) {
-                return null;
-            }
-
-            gl.shaderSource(shader, shaderScript);
-            gl.compileShader(shader);
-
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                alert(gl.getShaderInfoLog(shader));
-                console.log(gl.getShaderInfoLog(shader));
-                return null;
-            }
-
-            return shader;
-        }
-
-        function initShaders(shaderScripts) {
-
-            var vertexShader = getShader(gl, shaderScripts.vertexShader, gl.createShader(gl.VERTEX_SHADER));
-            var fragmentShader = getShader(gl, shaderScripts.fragmentShader, gl.createShader(gl.FRAGMENT_SHADER));
-
-            shaderProgram = gl.createProgram();
-            gl.attachShader(shaderProgram, vertexShader);
-            gl.attachShader(shaderProgram, fragmentShader);
-            gl.linkProgram(shaderProgram);
-
-            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-                alert("Could not initialize shaders");
-            }
-
-            gl.useProgram(shaderProgram);
-
-            shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-            gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
-
-            shaderProgram.vertexFrontColorAttribute = gl.getAttribLocation(shaderProgram, "aFrontColor");
-            gl.enableVertexAttribArray(shaderProgram.vertexFrontColorAttribute);
-
-            shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
-            gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
-
-            shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
-            shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
-            shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
-
-            shaderProgram.materialShininessUniform = gl.getUniformLocation(shaderProgram, "uMaterialShininess");
-
-            shaderProgram.pointLightingLocationUniform = gl.getUniformLocation(shaderProgram, "uPointLightingLocation");
-
-            shaderProgram.pointLightingSpecularColorUniform = gl.getUniformLocation(shaderProgram, "uPointLightingSpecularColor");
-            shaderProgram.pointLightingDiffuseColorUniform = gl.getUniformLocation(shaderProgram, "uPointLightingDiffuseColor");
-            shaderProgram.ambientColorUniform = gl.getUniformLocation(shaderProgram, "uAmbientColor");
-        }
-
-        function setMatrixUniforms() {
-            gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
-            gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
-
-            mat4.toInverseMat3(mvMatrix, nMatrix);
-            mat3.transpose(nMatrix);
-            gl.uniformMatrix3fv(shaderProgram.nMatrixUniform, false, nMatrix);
-        }
-
-        function setShaderAttributes() {
-
-            gl.uniform3f(
-                shaderProgram.pointLightingLocationUniform,
-                parseFloat(document.getElementById("pointLightingLocationX").value),
-                parseFloat(document.getElementById("pointLightingLocationY").value),
-                parseFloat(document.getElementById("pointLightingLocationZ").value)
-            );
-
-            gl.uniform3f(
-                shaderProgram.ambientColorUniform,
-                parseFloat(document.getElementById("ambientR").value),
-                parseFloat(document.getElementById("ambientG").value),
-                parseFloat(document.getElementById("ambientB").value)
-            );
-
-            gl.uniform3f(
-                shaderProgram.pointLightingSpecularColorUniform,
-                parseFloat(document.getElementById("specularR").value),
-                parseFloat(document.getElementById("specularG").value),
-                parseFloat(document.getElementById("specularB").value)
-            );
-
-            gl.uniform3f(
-                shaderProgram.pointLightingDiffuseColorUniform,
-                parseFloat(document.getElementById("diffuseR").value),
-                parseFloat(document.getElementById("diffuseG").value),
-                parseFloat(document.getElementById("diffuseB").value)
-            );
-
-            gl.uniform1f(shaderProgram.materialShininessUniform, parseFloat(document.getElementById("shininess").value));
-
-            // Setup model position data
-            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexPositionBuffer);
-            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute,
-                modelVertexPositionBuffer.itemSize,
-                gl.FLOAT,
-                false,
-                0,
-                0);
-
-            // Setup model front color data
-            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexFrontColorBuffer);
-            gl.vertexAttribPointer(shaderProgram.vertexFrontColorAttribute,
-                modelVertexFrontColorBuffer.itemSize,
-                gl.FLOAT,
-                false,
-                0,
-                0);
-
-            // Setup model normal data
-            gl.bindBuffer(gl.ARRAY_BUFFER, modelVertexNormalBuffer);
-            gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute,
-                modelVertexNormalBuffer.itemSize,
-                gl.FLOAT,
-                false,
-                0,
-                0);
-        }
-
-        function degToRad(degrees) {
-            return degrees * Math.PI / 180;
-        }
-
-        function setScales() {
-            let scaleX = parseFloat(document.getElementById("scaleX").value)
-            let scaleY = parseFloat(document.getElementById("scaleY").value)
-            let scaleZ = parseFloat(document.getElementById("scaleZ").value)
-
-            mat4.scale(mvMatrix, [scaleX, scaleY, scaleZ]);
-        }
-
-        function setTranslates() {
-            let translateX = parseFloat(document.getElementById("translateX").value)
-            let translateY = parseFloat(document.getElementById("translateY").value)
-            let translateZ = parseFloat(document.getElementById("translateZ").value)
-
-            mat4.translate(mvMatrix, [translateX, translateY, translateZ]);
-        }
-
-        function setRotations() {
-            let rotationX = parseFloat(document.getElementById("rotationX").value);
-            let rotationY = parseFloat(document.getElementById("rotationY").value);
-            let rotationZ = parseFloat(document.getElementById("rotationZ").value);
-
-            mat4.rotateX(mvMatrix, degToRad(rotationX));
-            mat4.rotateY(mvMatrix, degToRad(rotationY));
-            mat4.rotateZ(mvMatrix, degToRad(rotationZ));
-            mat4.rotate(mvMatrix, degToRad(modelAngle), [0, 1, 0]);
-        }
-
         /*
             TODO HERE:
             add two or more objects showing on the canvas
@@ -239,75 +45,24 @@
             gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-            if (modelVertexPositionBuffer == null ||
-                modelVertexNormalBuffer == null ||
-                modelVertexFrontColorBuffer == null) {
-
-                return;
-            }
-
-            setShaderAttributes();
-
-            // Setup Projection Matrix
-            mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
-
-            // Setup Model-View Matrix
-            mat4.identity(mvMatrix);
-
-            setScales();
-            setTranslates();
-            setRotations();
-
-            setMatrixUniforms();
-
-            gl.drawArrays(gl.TRIANGLES, 0, modelVertexPositionBuffer.numItems);
-        }
-
-        function animate() {
-            var timeNow = new Date().getTime();
-            if (lastTime != 0) {
-                var elapsed = timeNow - lastTime;
-                modelAngle += 0.03 * elapsed;
-            }
-
-            lastTime = timeNow;
+            drawObject();
         }
 
         function tick() {
             requestAnimFrame(tick);
             drawScene();
-            animate();
         }
 
         function webGLStart() {
             var canvas = document.getElementById("ICG-canvas");
             initGL(canvas);
-            updateShaderType()
-            loadModel("Teapot");
+
+            drawObject = initModel(gl, "Teapot")
 
             gl.clearColor(0, 0, 0, 1);
             gl.enable(gl.DEPTH_TEST);
 
             tick();
-        }
-
-        function updateShaderType(shaderOpt) {
-
-            var shaderScripts;
-
-            if (shaderOpt == "other") {
-                shaderScripts = shaders.other;
-            } else if (shaderOpt == "flat") {
-                shaderScripts = shaders.flat;
-            } else if (shaderOpt == "gouraud") {
-                shaderScripts = shaders.gouraud;
-            } else if (shaderOpt == "phong") {
-                shaderScripts = shaders.phong;
-            } else {
-                shaderScripts = shaders.other;
-            }
-
-            initShaders(shaderScripts)
         }
 
         function displayValue(val, elementId) {
@@ -320,198 +75,206 @@
 <body onload="webGLStart();">
     <canvas id="ICG-canvas" style="border: none;" width="1280" height="720"></canvas>
     <br />
-    <select id="shaderSelect" onchange="updateShaderType(this.value)">
+    <select id="shaderType">
         <option value="flat">flat</option>
         <option value="other" selected="selected">other</option>
         <option value="gouraud">gouraud</option>
         <option value="phong">phong</option>
     </select>
 
-    <select id="modelSelect" onchange="loadModel(this.value)">
-        <option value="Model" selected="selected">Model</option>
+    <select id="modelSelect">
+        <option value="Teapot" selected="selected">Teapot</option>
         <option value="Plant">Plant</option>
         <option value="Easter">Easter</option>
         <option value="Longteap">Longteap</option>
+        <option value="Kangaroo">Kangaroo</option>
+        <option value="Csie">Csie</option>
+        <option value="Tomcat">Tomcat</option>
+        <option value="Car_road">Car_road</option>
+        <option value="Church_s">Church_s</option>
+        <option value="Mercedes">Mercedes</option>
     </select>
 
-    <input type="range" id="shininess" value="32.0" min="0" max="100" step="0.5"
-        oninput="displayValue(this.value, 'shininess-val');">
-    <span id="shininess-val"></span>
+    <fieldset class="column-group">
+        <form class="pure-form-aligned">
+            <legend>Translate</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="translateX" class="pure-range"> X </label>
+                    <input type="range" id="translateX" value="0" min="-30" max="30" step="0.01"
+                        oninput="displayValue(this.value, 'translateX-val');">
+                    <span id="translateX-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="translateY" class="pure-range"> Y </label>
+                    <input type="range" id="translateY" value="0" min="-30" max="30" step="0.01"
+                        oninput="displayValue(this.value, 'translateY-val');">
+                    <span id="translateY-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="translateZ" class="pure-range"> Z </label>
+                    <input type="range" id="translateZ" value="-100" min="-100" max="10" step="0.01"
+                        oninput="displayValue(this.value, 'translateZ-val');">
+                    <span id="translateZ-val"></span>
+                </div>
+            </fieldset>
+        </form>
 
-    <form class="pure-form pure-form-aligned">
-        <legend>Translate</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="translateX" class="pure-range"> X </label>
-                <input type="range" id="translateX" value="0" min="-500" max="500" step="0.01"
-                    oninput="displayValue(this.value, 'translateX-val');">
-                <span id="translateX-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="translateY" class="pure-range"> Y </label>
-                <input type="range" id="translateY" value="0" min="-500" max="500" step="0.01"
-                    oninput="displayValue(this.value, 'translateY-val');">
-                <span id="translateY-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="translateZ" class="pure-range"> Z </label>
-                <input type="range" id="translateZ" value="-100" min="-500" max="500" step="0.01"
-                    oninput="displayValue(this.value, 'translateZ-val');">
-                <span id="translateZ-val"></span>
-            </div>
-        </fieldset>
-    </form>
+        <form class="pure-form-aligned">
+            <legend>Scale</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="scaleX" class="pure-range"> X </label>
+                    <input type="range" id="scaleX" value="1" min="0.1" max="5" step="0.01"
+                        oninput="displayValue(this.value, 'scaleX-val');">
+                    <span id="scaleX-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="scaleY" class="pure-range"> Y </label>
+                    <input type="range" id="scaleY" value="1" min="0.1" max="5" step="0.01"
+                        oninput="displayValue(this.value, 'scaleY-val');">
+                    <span id="scaleY-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="scaleZ" class="pure-range"> Z </label>
+                    <input type="range" id="scaleZ" value="1" min="0.1" max="5" step="0.01"
+                        oninput="displayValue(this.value, 'scaleZ-val');">
+                    <span id="scaleZ-val"></span>
+                </div>
+            </fieldset>
+        </form>
 
-    <form class="pure-form pure-form-aligned">
-        <legend>Point Lighting</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="lightPoint-0-enable" class="pure-checkbox">L1</label>
-                <input id="lightPoint-0-enable" type="checkbox"> Main Light
-            </div>
-            <div class="pure-control-group">
-                <label for="lightPoint-1-enable" class="pure-checkbox">L2</label>
-                <input id="lightPoint-1-enable" type="checkbox"> Key Light
-            </div>
-            <div class="pure-control-group">
-                <label for="lightPoint-2-enable" class="pure-checkbox">L3</label>
-                <input id="lightPoint-2-enable" type="checkbox"> Back Light
-            </div>
-        </fieldset>
-        <legend>Point Lighting Location</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="pointLightingLocationX" class="pure-range">X </label>
-                <input type="range" id="pointLightingLocationX" value="-10.0" min="-100" max="100"
-                    oninput="displayValue(this.value, 'pointLightingLocationX-val');">
-                <span id="pointLightingLocationX-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="pointLightingLocationY" class="pure-range">Y </label>
-                <input type="range" id="pointLightingLocationY" value="4.0" min="-100" max="100"
-                    oninput="displayValue(this.value, 'pointLightingLocationY-val');">
-                <span id="pointLightingLocationY-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="pointLightingLocationZ" class="pure-range">Z </label>
-                <input type="range" id="pointLightingLocationZ" value="-20.0" min="-100" max="100"
-                    oninput="displayValue(this.value, 'pointLightingLocationZ-val');">
-                <span id="pointLightingLocationZ-val"></span>
-            </div>
-        </fieldset>
-    </form>
+        <form class="pure-form-aligned">
+            <legend>Rotation</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="rotationX" class="pure-range"> X </label>
+                    <input type="range" id="rotationX" value="0" min="-180" max="180" step="1"
+                        oninput="displayValue(this.value, 'rotationX-val');">
+                    <span id="rotationX-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="rotationY" class="pure-range"> Y </label>
+                    <input type="range" id="rotationY" value="0" min="-180" max="180" step="1"
+                        oninput="displayValue(this.value, 'rotationY-val');">
+                    <span id="rotationY-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="rotationZ" class="pure-range"> Z </label>
+                    <input type="range" id="rotationZ" value="0" min="-180" max="180" step="1"
+                        oninput="displayValue(this.value, 'rotationZ-val');">
+                    <span id="rotationZ-val"></span>
+                </div>
+            </fieldset>
+        </form>
+    </fieldset>
 
-    <form class="pure-form pure-form-aligned">
-        <legend>Specular Color</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="specularR" class="pure-range"> R </label>
-                <input type="range" id="specularR" value="0.8" min="0" max="1" step="0.01"
-                    oninput="displayValue(this.value, 'specularR-val');">
-                <span id="specularR-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="specularG" class="pure-range"> G </label>
-                <input type="range" id="specularG" value="0.8" min="0" max="1" step="0.01"
-                    oninput="displayValue(this.value, 'specularG-val');">
-                <span id="specularG-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="specularB" class="pure-range"> B </label>
-                <input type="range" id="specularB" value="0.8" min="0" max="1" step="0.01"
-                    oninput="displayValue(this.value, 'specularB-val');">
-                <span id="specularB-val"></span>
-            </div>
-        </fieldset>
-    </form>
-    <form class="pure-form pure-form-aligned">
-        <legend>Diffuse Color</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="diffuseR" class="pure-range"> R </label>
-                <input type="range" id="diffuseR" value="0.8" min="0" max="1" step="0.01">
-                <span id="diffuseR-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="diffuseG" class="pure-range"> G </label>
-                <input type="range" id="diffuseG" value="0.8" min="0" max="1" step="0.01">
-                <span id="diffuseG-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="diffuseB" class="pure-range"> B </label>
-                <input type="range" id="diffuseB" value="0.8" min="0" max="1" step="0.01">
-                <span id="diffuseB-val"></span>
-            </div>
-        </fieldset>
-    </form>
-    <form class="pure-form pure-form-aligned">
-        <legend>Ambient Light Color</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="ambientR" class="pure-range"> R </label>
-                <input type="range" id="ambientR" value="0.2" min="0" max="1" step="0.01">
-                <span id="ambientR-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="ambientG" class="pure-range"> G </label>
-                <input type="range" id="ambientG" value="0.2" min="0" max="1" step="0.01">
-                <span id="ambientG-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="ambientB" class="pure-range"> B </label>
-                <input type="range" id="ambientB" value="0.2" min="0" max="1" step="0.01">
-                <span id="ambientB-val"></span>
-            </div>
-        </fieldset>
-    </form>
 
-    <form class="pure-form pure-form-aligned">
-        <legend>Scale</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="scaleX" class="pure-range"> X </label>
-                <input type="range" id="scaleX" value="1" min="0.1" max="5" step="0.01"
-                    oninput="displayValue(this.value, 'scaleX-val');">
-                <span id="scaleX-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="scaleY" class="pure-range"> Y </label>
-                <input type="range" id="scaleY" value="1" min="0.1" max="5" step="0.01"
-                    oninput="displayValue(this.value, 'scaleY-val');">
-                <span id="scaleY-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="scaleZ" class="pure-range"> Z </label>
-                <input type="range" id="scaleZ" value="1" min="0.1" max="5" step="0.01"
-                    oninput="displayValue(this.value, 'scaleZ-val');">
-                <span id="scaleZ-val"></span>
-            </div>
-        </fieldset>
-    </form>
 
-    <form class="pure-form pure-form-aligned">
-        <legend>Rotation</legend>
-        <fieldset>
-            <div class="pure-control-group">
-                <label for="rotationX" class="pure-range"> X </label>
-                <input type="range" id="rotationX" value="0" min="-180" max="180" step="1"
-                    oninput="displayValue(this.value, 'rotationX-val');">
-                <span id="rotationX-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="rotationY" class="pure-range"> Y </label>
-                <input type="range" id="rotationY" value="0" min="-180" max="180" step="1"
-                    oninput="displayValue(this.value, 'rotationY-val');">
-                <span id="rotationY-val"></span>
-            </div>
-            <div class="pure-control-group">
-                <label for="rotationZ" class="pure-range"> Z </label>
-                <input type="range" id="rotationZ" value="0" min="-180" max="180" step="1"
-                    oninput="displayValue(this.value, 'rotationZ-val');">
-                <span id="rotationZ-val"></span>
-            </div>
-        </fieldset>
-    </form>
+    <fieldset class="column-group">
+
+        <form class="pure-form-aligned">
+            <legend>Shininess</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="shininess" class="pure-range"> Shininess </label>
+                    <input type="range" id="shininess" value="32.0" min="0" max="100" step="0.5"
+                        oninput="displayValue(this.value, 'shininess-val');">
+                    <span id="shininess-val"></span>
+                </div>
+            </fieldset>
+        </form>
+
+        <form class="pure-form-aligned">
+            <legend>Point Lighting Location</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationX" class="pure-range">X </label>
+                    <input type="range" id="pointLightingLocationX" value="-10.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationX-val');">
+                    <span id="pointLightingLocationX-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationY" class="pure-range">Y </label>
+                    <input type="range" id="pointLightingLocationY" value="4.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationY-val');">
+                    <span id="pointLightingLocationY-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationZ" class="pure-range">Z </label>
+                    <input type="range" id="pointLightingLocationZ" value="-20.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationZ-val');">
+                    <span id="pointLightingLocationZ-val"></span>
+                </div>
+            </fieldset>
+        </form>
+
+        <form class="pure-form-aligned">
+            <legend>Specular Color</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="specularR" class="pure-range"> R </label>
+                    <input type="range" id="specularR" value="0.8" min="0" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'specularR-val');">
+                    <span id="specularR-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="specularG" class="pure-range"> G </label>
+                    <input type="range" id="specularG" value="0.8" min="0" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'specularG-val');">
+                    <span id="specularG-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="specularB" class="pure-range"> B </label>
+                    <input type="range" id="specularB" value="0.8" min="0" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'specularB-val');">
+                    <span id="specularB-val"></span>
+                </div>
+            </fieldset>
+        </form>
+        <form class="pure-form-aligned">
+            <legend>Diffuse Color</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="diffuseR" class="pure-range"> R </label>
+                    <input type="range" id="diffuseR" value="0.8" min="0" max="1" step="0.01">
+                    <span id="diffuseR-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="diffuseG" class="pure-range"> G </label>
+                    <input type="range" id="diffuseG" value="0.8" min="0" max="1" step="0.01">
+                    <span id="diffuseG-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="diffuseB" class="pure-range"> B </label>
+                    <input type="range" id="diffuseB" value="0.8" min="0" max="1" step="0.01">
+                    <span id="diffuseB-val"></span>
+                </div>
+            </fieldset>
+        </form>
+        <form class="pure-form-aligned">
+            <legend>Ambient Light Color</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="ambientR" class="pure-range"> R </label>
+                    <input type="range" id="ambientR" value="0.2" min="0" max="1" step="0.01">
+                    <span id="ambientR-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="ambientG" class="pure-range"> G </label>
+                    <input type="range" id="ambientG" value="0.2" min="0" max="1" step="0.01">
+                    <span id="ambientG-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="ambientB" class="pure-range"> B </label>
+                    <input type="range" id="ambientB" value="0.2" min="0" max="1" step="0.01">
+                    <span id="ambientB-val"></span>
+                </div>
+            </fieldset>
+        </form>
+    </fieldset>
+
+
 
 </body>
 
