@@ -119,6 +119,7 @@
 
             shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
             shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+            shaderProgram.nMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMatrix");
 
             shaderProgram.materialShininessUniform = gl.getUniformLocation(shaderProgram, "uMaterialShininess");
 
@@ -298,6 +299,8 @@
                 shaderScripts = shaders.other;
             } else if (shaderOpt == "flat") {
                 shaderScripts = shaders.flat;
+            } else if (shaderOpt == "gouraud") {
+                shaderScripts = shaders.gouraud;
             } else {
                 shaderScripts = shaders.other;
             }
