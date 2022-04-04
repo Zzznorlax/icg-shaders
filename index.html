@@ -18,6 +18,8 @@
         var gl;
 
         var drawObject;
+        var drawObjectLeft;
+        var drawObjectRight;
 
         function initGL(canvas) {
             try {
@@ -46,6 +48,8 @@
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
             drawObject();
+            drawObjectLeft();
+            drawObjectRight();
         }
 
         function tick() {
@@ -57,16 +61,18 @@
             var canvas = document.getElementById("ICG-canvas");
             initGL(canvas);
 
-            drawObject = initModel(gl, "Teapot")
+            drawObject = initModel(gl, "Teapot", [0, 0, 0])
+            drawObjectLeft = initModel(gl, "Kangaroo", [-36, 7, 0], [15.0, 15.0, 15.0], [-90.0, 0, 0])
+            drawObjectRight = initModel(gl, "Easter", [36, 6, 0], [15.0, 15.0, 15.0], [-90.0, 0, 0])
 
-            gl.clearColor(0, 0, 0, 1);
+            gl.clearColor(0, 0.2, 0.2, 1);
             gl.enable(gl.DEPTH_TEST);
 
             tick();
         }
 
         function displayValue(val, elementId) {
-            document.getElementById(elementId).innerHTML = val;
+            document.getElementById(elementId).textContent = val;
         }
 
     </script>
@@ -75,25 +81,43 @@
 <body onload="webGLStart();">
     <canvas id="ICG-canvas" style="border: none;" width="1280" height="720"></canvas>
     <br />
-    <select id="shaderType">
-        <option value="flat">flat</option>
-        <option value="other" selected="selected">other</option>
-        <option value="gouraud">gouraud</option>
-        <option value="phong">phong</option>
-    </select>
 
-    <select id="modelSelect">
-        <option value="Teapot" selected="selected">Teapot</option>
-        <option value="Plant">Plant</option>
-        <option value="Easter">Easter</option>
-        <option value="Longteap">Longteap</option>
-        <option value="Kangaroo">Kangaroo</option>
-        <option value="Csie">Csie</option>
-        <option value="Tomcat">Tomcat</option>
-        <option value="Car_road">Car_road</option>
-        <option value="Church_s">Church_s</option>
-        <option value="Mercedes">Mercedes</option>
-    </select>
+    <fieldset class="column-group">
+
+        <form class="pure-form-aligned">
+            <legend>Shading</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <select id="shaderType">
+                        <option value="none" selected="selected">none</option>
+                        <option value="flat">flat</option>
+                        <option value="gouraud">gouraud</option>
+                        <option value="phong">phong</option>
+                    </select>
+                </div>
+            </fieldset>
+        </form>
+
+        <form class="pure-form-aligned">
+            <legend>Model</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <select id="modelSelect">
+                        <option value="Teapot" selected="selected">Teapot</option>
+                        <option value="Plant">Plant</option>
+                        <option value="Easter">Easter</option>
+                        <option value="Longteap">Longteap</option>
+                        <option value="Kangaroo">Kangaroo</option>
+                        <option value="Csie">Csie</option>
+                        <option value="Tomcat">Tomcat</option>
+                        <option value="Car_road">Car_road</option>
+                        <option value="Church_s">Church_s</option>
+                        <option value="Mercedes">Mercedes</option>
+                    </select>
+                </div>
+            </fieldset>
+        </form>
+    </fieldset>
 
     <fieldset class="column-group">
         <form class="pure-form-aligned">
@@ -113,7 +137,7 @@
                 </div>
                 <div class="pure-control-group">
                     <label for="translateZ" class="pure-range"> Z </label>
-                    <input type="range" id="translateZ" value="-100" min="-100" max="10" step="0.01"
+                    <input type="range" id="translateZ" value="-80" min="-100" max="10" step="0.01"
                         oninput="displayValue(this.value, 'translateZ-val');">
                     <span id="translateZ-val"></span>
                 </div>
@@ -124,19 +148,19 @@
             <legend>Scale</legend>
             <fieldset>
                 <div class="pure-control-group">
-                    <label for="scaleX" class="pure-range"> X </label>
+                    <label for="scaleX" class="pure-range"> X_0 </label>
                     <input type="range" id="scaleX" value="1" min="0.1" max="5" step="0.01"
                         oninput="displayValue(this.value, 'scaleX-val');">
                     <span id="scaleX-val"></span>
                 </div>
                 <div class="pure-control-group">
-                    <label for="scaleY" class="pure-range"> Y </label>
+                    <label for="scaleY" class="pure-range"> Y_0 </label>
                     <input type="range" id="scaleY" value="1" min="0.1" max="5" step="0.01"
                         oninput="displayValue(this.value, 'scaleY-val');">
                     <span id="scaleY-val"></span>
                 </div>
                 <div class="pure-control-group">
-                    <label for="scaleZ" class="pure-range"> Z </label>
+                    <label for="scaleZ" class="pure-range"> Z_0 </label>
                     <input type="range" id="scaleZ" value="1" min="0.1" max="5" step="0.01"
                         oninput="displayValue(this.value, 'scaleZ-val');">
                     <span id="scaleZ-val"></span>
@@ -167,9 +191,50 @@
                 </div>
             </fieldset>
         </form>
+
+        <form class="pure-form-aligned">
+            <legend>Shear</legend>
+            <fieldset>
+                <div class="pure-control-group">
+                    <label for="shearXY" class="pure-range"> XY </label>
+                    <input type="range" id="shearXY" value="0" min="-1" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'shearXY-val');">
+                    <span id="shearXY-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="shearXZ" class="pure-range"> XZ </label>
+                    <input type="range" id="shearXZ" value="0" min="-1" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'shearXZ-val');">
+                    <span id="shearXZ-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="shearYX" class="pure-range"> YX </label>
+                    <input type="range" id="shearYX" value="0" min="-1" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'shearYX-val');">
+                    <span id="shearYX-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="shearYZ" class="pure-range"> YZ </label>
+                    <input type="range" id="shearYZ" value="0" min="-1" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'shearYZ-val');">
+                    <span id="shearYZ-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="shearZX" class="pure-range"> ZX </label>
+                    <input type="range" id="shearZX" value="0" min="-1" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'shearZX-val');">
+                    <span id="shearZX-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="shearZY" class="pure-range"> ZY </label>
+                    <input type="range" id="shearZY" value="0" min="-1" max="1" step="0.01"
+                        oninput="displayValue(this.value, 'shearZY-val');">
+                    <span id="shearZY-val"></span>
+                </div>
+            </fieldset>
+        </form>
+
     </fieldset>
-
-
 
     <fieldset class="column-group">
 
@@ -189,22 +254,58 @@
             <legend>Point Lighting Location</legend>
             <fieldset>
                 <div class="pure-control-group">
-                    <label for="pointLightingLocationX" class="pure-range">X </label>
-                    <input type="range" id="pointLightingLocationX" value="-10.0" min="-100" max="100"
-                        oninput="displayValue(this.value, 'pointLightingLocationX-val');">
-                    <span id="pointLightingLocationX-val"></span>
+                    <label for="pointLightingLocationX0" class="pure-range"> Key light X </label>
+                    <input type="range" id="pointLightingLocationX0" value="100.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationX0-val');">
+                    <span id="pointLightingLocationX0-val"></span>
                 </div>
                 <div class="pure-control-group">
-                    <label for="pointLightingLocationY" class="pure-range">Y </label>
-                    <input type="range" id="pointLightingLocationY" value="4.0" min="-100" max="100"
-                        oninput="displayValue(this.value, 'pointLightingLocationY-val');">
-                    <span id="pointLightingLocationY-val"></span>
+                    <label for="pointLightingLocationY0" class="pure-range"> Key light Y </label>
+                    <input type="range" id="pointLightingLocationY0" value="10.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationY0-val');">
+                    <span id="pointLightingLocationY0-val"></span>
                 </div>
                 <div class="pure-control-group">
-                    <label for="pointLightingLocationZ" class="pure-range">Z </label>
-                    <input type="range" id="pointLightingLocationZ" value="-20.0" min="-100" max="100"
-                        oninput="displayValue(this.value, 'pointLightingLocationZ-val');">
-                    <span id="pointLightingLocationZ-val"></span>
+                    <label for="pointLightingLocationZ0" class="pure-range"> Key light Z </label>
+                    <input type="range" id="pointLightingLocationZ0" value="100.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationZ0-val');">
+                    <span id="pointLightingLocationZ0-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationX1" class="pure-range"> Fill light X </label>
+                    <input type="range" id="pointLightingLocationX1" value="100.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationX1-val');">
+                    <span id="pointLightingLocationX1-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationY1" class="pure-range"> Fill light Y </label>
+                    <input type="range" id="pointLightingLocationY1" value="-50.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationY1-val');">
+                    <span id="pointLightingLocationY1-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationZ1" class="pure-range"> Fill light Z </label>
+                    <input type="range" id="pointLightingLocationZ1" value="100.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationZ1-val');">
+                    <span id="pointLightingLocationZ1-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationX2" class="pure-range"> Backlight X </label>
+                    <input type="range" id="pointLightingLocationX2" value="-100.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationX2-val');">
+                    <span id="pointLightingLocationX2-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationY2" class="pure-range"> Backlight Y </label>
+                    <input type="range" id="pointLightingLocationY2" value="0.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationY2-val');">
+                    <span id="pointLightingLocationY2-val"></span>
+                </div>
+                <div class="pure-control-group">
+                    <label for="pointLightingLocationZ2" class="pure-range"> Backlight Z </label>
+                    <input type="range" id="pointLightingLocationZ2" value="-100.0" min="-100" max="100"
+                        oninput="displayValue(this.value, 'pointLightingLocationZ2-val');">
+                    <span id="pointLightingLocationZ2-val"></span>
                 </div>
             </fieldset>
         </form>
@@ -237,17 +338,17 @@
             <fieldset>
                 <div class="pure-control-group">
                     <label for="diffuseR" class="pure-range"> R </label>
-                    <input type="range" id="diffuseR" value="0.8" min="0" max="1" step="0.01">
+                    <input type="range" id="diffuseR" value="0.36" min="0" max="1" step="0.01">
                     <span id="diffuseR-val"></span>
                 </div>
                 <div class="pure-control-group">
                     <label for="diffuseG" class="pure-range"> G </label>
-                    <input type="range" id="diffuseG" value="0.8" min="0" max="1" step="0.01">
+                    <input type="range" id="diffuseG" value="0.36" min="0" max="1" step="0.01">
                     <span id="diffuseG-val"></span>
                 </div>
                 <div class="pure-control-group">
                     <label for="diffuseB" class="pure-range"> B </label>
-                    <input type="range" id="diffuseB" value="0.8" min="0" max="1" step="0.01">
+                    <input type="range" id="diffuseB" value="0.36" min="0" max="1" step="0.01">
                     <span id="diffuseB-val"></span>
                 </div>
             </fieldset>

@@ -1,12 +1,12 @@
 
 var shaders = shaders || {
-    other: {},
+    none: {},
     gouraud: {},
     flat: {},
     phong: {},
 };
 
-shaders.other.vertexShader = `
+shaders.none.vertexShader = `
 attribute vec3 aVertexPosition;
 attribute vec3 aVertexNormal;
 attribute vec3 aFrontColor;
@@ -22,7 +22,7 @@ void main(void) {
 }
 `
 
-shaders.other.fragmentShader = `
+shaders.none.fragmentShader = `
 precision mediump float;
 
 varying vec4 fragcolor;
@@ -41,19 +41,20 @@ attribute vec3 aFrontColor;
 
 uniform mat4 uMVMatrix;
 uniform mat4 uPMatrix;
-// uniform mat3 uNMatrix;
+
+uniform vec3 uPointLightingLocation[3];
 
 varying vec4 vFragcolor;
 varying vec3 vVertexPosition;
-varying vec3 vLightDirection;
-
-uniform vec3 uPointLightingLocation;
+varying vec3 vLightDirection[3];
 
 void main(void) {
 
     vVertexPosition = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
 
-    vLightDirection = normalize(uPointLightingLocation - vVertexPosition);
+    for (int i = 0; i < 3; i++) {
+		vLightDirection[i] = normalize(uPointLightingLocation[i] - vVertexPosition);
+	}
 
     vFragcolor = vec4(aFrontColor, 1.0);
 
@@ -65,32 +66,36 @@ shaders.flat.fragmentShader = `
 #extension GL_OES_standard_derivatives : enable
 precision mediump float;
 
-varying vec4 vFragcolor;
-varying vec3 vLightDirection;
-varying vec3 vVertexPosition;
-
 uniform float uMaterialShininess;
 
 uniform vec3 uAmbientColor;
 uniform vec3 uPointLightingSpecularColor;
 uniform vec3 uPointLightingDiffuseColor;
 
+varying vec4 vFragcolor;
+varying vec3 vLightDirection[3];
+varying vec3 vVertexPosition;
+
 void main(void) {
 
 	vec3 normal = normalize(cross(dFdx(vVertexPosition), dFdy(vVertexPosition)));
 
-    vec3 reflectionDirection = reflect(-vLightDirection, normal);
+    vec3 lightWeighting = vec3(0.0, 0.0, 0.0);
 
-    float specularLightWeighting = pow(max(dot(reflectionDirection, normalize(-vVertexPosition.xyz)), 0.0), uMaterialShininess);
+    for (int i = 0; i < 3; i++) {
 
-    float diffuseLightWeighting = max(dot(normal, vLightDirection), 0.0);
+        vec3 reflectionDirection = reflect(-vLightDirection[i], normal);
 
-    vec3 lightWeighting = uAmbientColor + uPointLightingSpecularColor * specularLightWeighting + uPointLightingDiffuseColor * diffuseLightWeighting;
+        float specularLightWeighting = pow(max(dot(reflectionDirection, normalize(-vVertexPosition.xyz)), 0.0), uMaterialShininess);
+
+        float diffuseLightWeighting = max(dot(normal, vLightDirection[i]), 0.0);
+
+        lightWeighting += uAmbientColor + uPointLightingSpecularColor * specularLightWeighting + uPointLightingDiffuseColor * diffuseLightWeighting;
+    }
 
 	gl_FragColor = vec4(vFragcolor.rgb * lightWeighting, vFragcolor.a);
 }
 `
-
 
 shaders.gouraud.vertexShader = `
 precision mediump float;
@@ -103,18 +108,17 @@ uniform mat4 uMVMatrix;
 uniform mat4 uPMatrix;
 uniform mat3 uNMatrix;
 
-varying vec4 vFragcolor;
-varying vec3 vNormalDirection;
-varying vec3 vVertexPosition;
-varying vec3 vLightDirection;
-
-uniform vec3 uPointLightingLocation;
-
 uniform float uMaterialShininess;
+
+uniform vec3 uPointLightingLocation[3];
 
 uniform vec3 uAmbientColor;
 uniform vec3 uPointLightingSpecularColor;
 uniform vec3 uPointLightingDiffuseColor;
+
+varying vec4 vFragcolor;
+varying vec3 vNormalDirection;
+varying vec3 vVertexPosition;
 
 void main(void) {
 
@@ -122,15 +126,20 @@ void main(void) {
 
     vVertexPosition = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
 
-    vLightDirection = normalize(uPointLightingLocation - vVertexPosition);
+    vec3 lightWeighting = vec3(0.0, 0.0, 0.0);
 
-    vec3 reflectionDirection = reflect(-vLightDirection, vNormalDirection);
+    for (int i = 0; i < 3; i++) {
 
-    float specularLightWeighting = pow(max(dot(reflectionDirection, normalize(-vVertexPosition.xyz)), 0.0), uMaterialShininess);
+        vec3 lightDirection = normalize(uPointLightingLocation[i] - vVertexPosition);
 
-    float diffuseLightWeighting = max(dot(vNormalDirection, vLightDirection), 0.0);
+        vec3 reflectionDirection = reflect(-lightDirection, vNormalDirection);
 
-    vec3 lightWeighting = uAmbientColor + uPointLightingSpecularColor * specularLightWeighting + uPointLightingDiffuseColor * diffuseLightWeighting;
+        float specularLightWeighting = pow(max(dot(reflectionDirection, normalize(-vVertexPosition.xyz)), 0.0), uMaterialShininess);
+
+        float diffuseLightWeighting = max(dot(lightDirection, vNormalDirection), 0.0);
+
+        lightWeighting += uAmbientColor + uPointLightingSpecularColor * specularLightWeighting + uPointLightingDiffuseColor * diffuseLightWeighting;
+    }
 
     vFragcolor = vec4(aFrontColor, 1.0);
     vFragcolor = vec4(vFragcolor.rgb * lightWeighting, vFragcolor.a);
@@ -160,12 +169,12 @@ uniform mat4 uMVMatrix;
 uniform mat4 uPMatrix;
 uniform mat3 uNMatrix;
 
+uniform vec3 uPointLightingLocation[3];
+
+varying vec3 vLightDirection[3];
 varying vec4 vFragcolor;
 varying vec3 vNormalDirection;
 varying vec3 vVertexPosition;
-varying vec3 vLightDirection;
-
-uniform vec3 uPointLightingLocation;
 
 void main(void) {
 
@@ -173,7 +182,9 @@ void main(void) {
 
     vVertexPosition = (uMVMatrix * vec4(aVertexPosition, 1.0)).xyz;
 
-    vLightDirection = normalize(uPointLightingLocation - vVertexPosition);
+    for (int i = 0; i < 3; i++) {
+        vLightDirection[i] = normalize(uPointLightingLocation[i] - vVertexPosition);
+    }
 
     vFragcolor = vec4(aFrontColor, 1.0);
 
@@ -184,26 +195,31 @@ void main(void) {
 shaders.phong.fragmentShader = `
 precision mediump float;
 
-varying vec4 vFragcolor;
-varying vec3 vLightDirection;
-varying vec3 vNormalDirection;
-varying vec3 vVertexPosition;
-
 uniform float uMaterialShininess;
 
 uniform vec3 uAmbientColor;
 uniform vec3 uPointLightingSpecularColor;
 uniform vec3 uPointLightingDiffuseColor;
 
+varying vec3 vLightDirection[3];
+varying vec4 vFragcolor;
+varying vec3 vNormalDirection;
+varying vec3 vVertexPosition;
+
 void main(void) {
 
-    vec3 reflectionDirection = reflect(-vLightDirection, vNormalDirection);
+    vec3 lightWeighting = vec3(0.0, 0.0, 0.0);
 
-    float specularLightWeighting = pow(max(dot(reflectionDirection, normalize(-vVertexPosition.xyz)), 0.0), uMaterialShininess);
+    for (int i = 0; i < 3; i++) {
 
-    float diffuseLightWeighting = max(dot(vNormalDirection, vLightDirection), 0.0);
+        vec3 reflectionDirection = reflect(-vLightDirection[i], vNormalDirection);
 
-    vec3 lightWeighting = uAmbientColor + uPointLightingSpecularColor * specularLightWeighting + uPointLightingDiffuseColor * diffuseLightWeighting;
+        float specularLightWeighting = pow(max(dot(reflectionDirection, normalize(-vVertexPosition.xyz)), 0.0), uMaterialShininess);
+
+        float diffuseLightWeighting = max(dot(vLightDirection[i], vNormalDirection), 0.0);
+
+        lightWeighting += uAmbientColor + uPointLightingSpecularColor * specularLightWeighting + uPointLightingDiffuseColor * diffuseLightWeighting;
+    }
 
 	gl_FragColor = vec4(vFragcolor.rgb * lightWeighting, vFragcolor.a);
 }

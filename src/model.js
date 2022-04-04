@@ -1,7 +1,7 @@
 
 
 
-function initModel(gl, modelName) {
+function initModel(gl, modelName, initTranslate = [0, 0, 0], initScale = [1, 1, 1], initRotate = [0, 0, 0]) {
 
     var shaderProgram;
 
@@ -114,11 +114,16 @@ function initModel(gl, modelName) {
 
     function setShaderAttributes() {
 
-        gl.uniform3f(
+        let lightLocationArray = []
+        for (let i = 0; i < 3; i++) {
+            lightLocationArray.push(parseFloat(document.getElementById(`pointLightingLocationX${i}`).value));
+            lightLocationArray.push(parseFloat(document.getElementById(`pointLightingLocationY${i}`).value));
+            lightLocationArray.push(parseFloat(document.getElementById(`pointLightingLocationZ${i}`).value));
+        }
+
+        gl.uniform3fv(
             shaderProgram.pointLightingLocationUniform,
-            parseFloat(document.getElementById("pointLightingLocationX").value),
-            parseFloat(document.getElementById("pointLightingLocationY").value),
-            parseFloat(document.getElementById("pointLightingLocationZ").value)
+            lightLocationArray
         );
 
         gl.uniform3f(
@@ -176,12 +181,30 @@ function initModel(gl, modelName) {
         return degrees * Math.PI / 180;
     }
 
+    function setShears() {
+        let shearXY = parseFloat(document.getElementById("shearXY").value)
+        let shearXZ = parseFloat(document.getElementById("shearXZ").value)
+        let shearYX = parseFloat(document.getElementById("shearYX").value)
+        let shearYZ = parseFloat(document.getElementById("shearYZ").value)
+        let shearZX = parseFloat(document.getElementById("shearZX").value)
+        let shearZY = parseFloat(document.getElementById("shearZY").value)
+
+        let transformMatrix = [
+            1, shearXY, shearXZ, 0,
+            shearYX, 1, shearYZ, 0,
+            shearZX, shearZY, 1, 0,
+            0, 0, 0, 1,
+        ];
+
+        mvMatrix = mat4.multiply(mvMatrix, mat4.create(transformMatrix))
+    }
+
     function setScales() {
         let scaleX = parseFloat(document.getElementById("scaleX").value)
         let scaleY = parseFloat(document.getElementById("scaleY").value)
         let scaleZ = parseFloat(document.getElementById("scaleZ").value)
 
-        mat4.scale(mvMatrix, [scaleX, scaleY, scaleZ]);
+        mat4.scale(mvMatrix, [initScale[0] * scaleX, initScale[1] * scaleY, initScale[2] * scaleZ]);
     }
 
     function setTranslates() {
@@ -189,7 +212,7 @@ function initModel(gl, modelName) {
         let translateY = parseFloat(document.getElementById("translateY").value)
         let translateZ = parseFloat(document.getElementById("translateZ").value)
 
-        mat4.translate(mvMatrix, [translateX, translateY, translateZ]);
+        mat4.translate(mvMatrix, [initTranslate[0] + translateX, initTranslate[1] + translateY, initTranslate[2] + translateZ]);
     }
 
     function setRotations() {
@@ -197,10 +220,11 @@ function initModel(gl, modelName) {
         let rotationY = parseFloat(document.getElementById("rotationY").value);
         let rotationZ = parseFloat(document.getElementById("rotationZ").value);
 
-        mat4.rotateX(mvMatrix, degToRad(rotationX));
-        mat4.rotateY(mvMatrix, degToRad(rotationY));
-        mat4.rotateZ(mvMatrix, degToRad(rotationZ));
         mat4.rotate(mvMatrix, degToRad(modelAngle), [0, 1, 0]);
+
+        mat4.rotateX(mvMatrix, degToRad(initRotate[0]) + degToRad(rotationX));
+        mat4.rotateY(mvMatrix, degToRad(initRotate[1]) + degToRad(rotationY));
+        mat4.rotateZ(mvMatrix, degToRad(initRotate[2]) + degToRad(rotationZ));
     }
 
     function animate() {
@@ -218,16 +242,14 @@ function initModel(gl, modelName) {
         shaderType = document.getElementById("shaderType").value
         var shaderScripts;
 
-        if (shaderType == "other") {
-            shaderScripts = shaders.other;
-        } else if (shaderType == "flat") {
+        if (shaderType == "flat") {
             shaderScripts = shaders.flat;
         } else if (shaderType == "gouraud") {
             shaderScripts = shaders.gouraud;
         } else if (shaderType == "phong") {
             shaderScripts = shaders.phong;
         } else {
-            shaderScripts = shaders.other;
+            shaderScripts = shaders.none;
         }
 
         initShaders(shaderScripts)
@@ -262,9 +284,10 @@ function initModel(gl, modelName) {
         updateShaderType();
         setShaderAttributes();
 
-        setScales();
         setTranslates();
+        setScales();
         setRotations();
+        setShears();
 
         setMatrixUniforms();
 
