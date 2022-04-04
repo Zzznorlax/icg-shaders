@@ -1,8 +1,19 @@
 
+.canvas-container {
+    float: left;
+    width: 1280px;
+}
+
+.object-panel-group {
+    float: left;
+    width: 500px;
+    padding: 10px;
+    margin: 10px;
+  }
 
 .column-group {
     float: left;
-    width: 25.0%; /* three boxes (use 25% for four, and 50% for two, etc) */
-    padding: 10px; /* if you want space between the images */
+    width: 200px;
+    padding: 10px;
     margin: 10px;
   }
