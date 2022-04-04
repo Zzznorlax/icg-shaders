@@ -6,13 +6,13 @@
   - [x] Flat shading
   - [x] Gouraud shading
   - [x] Phong shading
-- [ ] Enable 4 transformations
+- [x] Enable 4 transformations
   - [x] Translation
   - [x] Scale
   - [x] Rotation
-  - [ ] Shear
-- [ ] Display at least 3 objects in a scene
-- [ ] At least 3 light sources
+  - [x] Shear
+- [x] Display at least 3 objects in a scene
+- [x] At least 3 light sources
 
 
 ### Reference
